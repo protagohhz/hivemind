@@ -18,7 +18,7 @@ import ctypes
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import Iterable, List, Optional, Sequence, Union, Callable, Awaitable, TypeVar
+from typing import Iterable, Optional, Sequence, Union, Callable, Awaitable, TypeVar
 
 import hivemind
 from hivemind.client import RemoteExpert
@@ -97,6 +97,7 @@ class DHT(mp.Process):
     def shutdown(self) -> None:
         """ Shut down a running dht process """
         if self.is_alive():
+            print(end=f'TERMINATED DHT {self.pid}\n', flush=True)
             self.terminate()
         else:
             logger.warning("DHT shutdown has no effect: dht process is already not alive")

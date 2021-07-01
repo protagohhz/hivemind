@@ -245,7 +245,7 @@ class DecentralizedAverager(mp.Process, averaging_pb2_grpc.DecentralizedAveragin
             self._pipe.send(('_SHUTDOWN', None))
             self.terminate()
         else:
-            logger.warning("DHT shutdown has no effect: the process is not alive")
+            logger.warning("Averager shutdown has no effect: the process is not alive")
 
     def __del__(self):
         if self._parent_pid != os.getpid() or self.is_alive():

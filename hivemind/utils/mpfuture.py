@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures._base as base
 import contextlib
+import functools
 import multiprocessing as mp
 import multiprocessing.connection
 import os
@@ -53,7 +54,7 @@ class MPFuture(base.Future, Generic[ResultType]):
     """
     lock = mp.Lock()  # global lock that prevents simultaneous initialization and writing
     pipe_waiter_thread: Optional[threading.Thread] = None  # process-specific thread that receives results/exceptions
-    global_mpfuture_receivers: Dict[PID, PipeEnd] = mp.Manager().dict()
+    global_mpfuture_pipes: Dict[PID, PipeEnd] = mp.Manager().dict()
     active_futures: Optional[Dict[PID, MPFuture]] = None  # pending or running futures originated from current process
     active_pid: Optional[PID] = None  # pid of currently active process; used to handle forks natively
 
@@ -69,8 +70,10 @@ class MPFuture(base.Future, Generic[ResultType]):
 
         if self.active_pid != self._origin_pid:
             self._initialize_mpfuture_backend()
+
         assert self._uid not in self.active_futures
         self.active_futures[self._uid] = self
+        self._send_pipe = self.global_mpfuture_pipes[self._origin_pid]
 
         try:
             self._loop = loop or asyncio.get_event_loop()
@@ -102,23 +105,23 @@ class MPFuture(base.Future, Generic[ResultType]):
     async def _event_setter(self):
         self._aio_event.set()
 
-    @property
-    def _sender_pipe(self) -> mp.connection.Connection:
-        """ a pipe that can be used to send updates to the MPFuture creator """
-        return self.global_mpfuture_receivers[self._origin_pid]
-
     @classmethod
     def _initialize_mpfuture_backend(cls):
         pid = os.getpid()
         logger.debug(f"Initializing MPFuture backend for pid {pid}")
-        assert pid != cls.active_pid and pid not in cls.global_mpfuture_receivers, "already initialized"
+        assert pid != cls.active_pid and pid not in cls.global_mpfuture_pipes, "already initialized"
+
+        if cls.lock._semlock._get_value() == 0:
+            print(end='LOCKED!!!\n', flush=True)
 
         with cls.lock:
+            print(end='<lock> - init\n', flush=True)
             recv_pipe, send_pipe = mp.Pipe(duplex=False)
-            cls.active_pid, cls.active_futures, cls.global_mpfuture_receivers[pid] = pid, {}, send_pipe
+            cls.active_pid, cls.active_futures, cls.global_mpfuture_pipes[pid] = pid, {}, send_pipe
             cls.pipe_waiter_thread = threading.Thread(target=cls._process_updates_in_background, args=[recv_pipe],
-                                                      name=f'{__name__}.BACKEND', daemon=True)
+                                                      name=f'{__name__}.BACKEND', daemon=False)
             cls.pipe_waiter_thread.start()
+        print(end='</lock> - init\n', flush=True)
 
     @classmethod
     def _process_updates_in_background(cls, receiver_pipe: mp.connection.Connection):
@@ -144,8 +147,18 @@ class MPFuture(base.Future, Generic[ResultType]):
 
     def _send_update(self, update_type: UpdateType, payload: Any = None):
         """ this method sends result, exception or cancel to the MPFuture origin. """
+        left = threading.Event()
+
         with self.lock if self.use_lock else contextlib.nullcontext():
-            self._sender_pipe.send((self._uid, update_type, payload))
+            print(end='<lock> - send\n')
+            try:
+                import faulthandler, sys;
+                faulthandler.dump_traceback(all_threads=False, file=sys.stdout)
+                sys.stdout.flush()
+                self._send_pipe.send((self._uid, update_type, payload))
+                left.set()
+            finally:
+                print(end='</lock> - send\n')
 
     def set_result(self, result: ResultType):
         if os.getpid() == self._origin_pid:
@@ -250,6 +263,7 @@ class MPFuture(base.Future, Generic[ResultType]):
         self._result, self._exception = state['_result'], state['_exception']
         self.use_lock = state['use_lock']
 
+        self._send_pipe = self.global_mpfuture_pipes[self._origin_pid]
         self._waiters, self._done_callbacks = [], []
         self._condition = threading.Condition()
         self._aio_event = self._loop = None

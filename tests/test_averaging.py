@@ -281,6 +281,11 @@ def test_load_balancing():
         assert np.sum(assignment) == vector_size
         assert np.min(assignment) >= 0
 
+if __name__ == '__main__':
+    test_allgather()
+    test_allreduce_weighted()
+    test_allreduce_grid()
+
 
 @pytest.mark.forked
 def test_too_few_peers():
