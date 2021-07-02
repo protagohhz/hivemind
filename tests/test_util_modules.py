@@ -88,14 +88,17 @@ def test_mpfuture_cancel():
 
 
 def test_mpfuture_status():
+    evt = mp.Event()
     future = hivemind.MPFuture()
 
     def _proc1(future):
         assert future.set_running_or_notify_cancel() is True
+        evt.set()
 
     p = mp.Process(target=_proc1, args=(future,))
     p.start()
     p.join()
+    assert evt.is_set()
 
     assert future.running() and not future.done() and not future.cancelled()
     with pytest.raises(InvalidStateError):
