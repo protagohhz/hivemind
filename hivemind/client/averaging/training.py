@@ -51,7 +51,7 @@ class TrainingAverager(DecentralizedAverager):
         params = averaged_tensors[:len(averaged_tensors) // 2]
         grads = averaged_tensors[len(averaged_tensors) // 2:]
         compression = [CompressionType.FLOAT16 for p in params]
-        compression.extend([CompressionType.FLOAT16 if g.numel() <= 2 ** 16 else CompressionType.UNIFORM_8BIT
+        compression.extend([CompressionType.FLOAT16 if g.numel() <= 2 ** 16 else CompressionType.QUANTILE_8BIT
                             for g in grads])
 
         for g in grads:
