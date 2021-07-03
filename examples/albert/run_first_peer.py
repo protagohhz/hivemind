@@ -27,44 +27,43 @@ class CoordinatorArguments(BaseTrainingArguments):
     new workers still can join the collaboration via alive initial peers' addresses.
     Specify initial_peers argument for that purpose
     """
+
     address: Optional[str] = field(
         default=None,
-        metadata={"help": "This machine's network address. Use public IP for global experiments, "
-                          "local address for private runs"}
+        metadata={
+            "help": "This machine's network address. Use public IP for global experiments, "
+            "local address for private runs"
+        },
     )
     refresh_period: float = field(
-        default=30,
-        metadata={"help": "Coordinator will fetch keys from DHT once in this many seconds"}
+        default=30, metadata={"help": "Coordinator will fetch keys from DHT once in this many seconds"}
     )
-    wandb_project: Optional[str] = field(
-        default=None,
-        metadata={"help": "Learning curves will be published there"}
-    )
+    wandb_project: Optional[str] = field(default=None, metadata={"help": "Learning curves will be published there"})
     save_checkpoint_step_interval: int = field(
-        default=5,
-        metadata={"help": "Coordinator will load and save state from peers once every that many steps"}
+        default=5, metadata={"help": "Coordinator will load and save state from peers once every that many steps"}
     )
     model_config_path: str = field(
-        default='https://s3.amazonaws.com/models.huggingface.co/bert/albert-large-v2-config.json',
-        metadata={"help": "Path to the model config"}
+        default="https://s3.amazonaws.com/models.huggingface.co/bert/albert-large-v2-config.json",
+        metadata={"help": "Path to the model config"},
     )
     repo_path: Optional[str] = field(
         default=None,
-        metadata={"help": "Path to HuggingFace repo in which coordinator will upload the model and optimizer states"}
+        metadata={"help": "Path to HuggingFace repo in which coordinator will upload the model and optimizer states"},
     )
     upload_interval: Optional[float] = field(
-        default=None,
-        metadata={"help": "Coordinator will upload model once in this many seconds"}
+        default=None, metadata={"help": "Coordinator will upload model once in this many seconds"}
     )
-    store_checkpoins: bool = field(
-        default=False,
-        metadata={"help": "If True, enables CheckpointHandler"}
-    )
+    store_checkpoins: bool = field(default=False, metadata={"help": "If True, enables CheckpointHandler"})
 
 
 class CheckpointHandler:
-    def __init__(self, coordinator_args: CoordinatorArguments, collab_optimizer_args: CollaborativeOptimizerArguments,
-                 averager_args: AveragerArguments, dht: hivemind.DHT):
+    def __init__(
+        self,
+        coordinator_args: CoordinatorArguments,
+        collab_optimizer_args: CollaborativeOptimizerArguments,
+        averager_args: AveragerArguments,
+        dht: hivemind.DHT,
+    ):
         self.save_checkpoint_step_interval = coordinator_args.save_checkpoint_step_interval
         self.repo_path = coordinator_args.repo_path
         self.upload_interval = coordinator_args.upload_interval
@@ -87,17 +86,25 @@ class CheckpointHandler:
 
         opt = Lamb(
             optimizer_grouped_parameters,
-            lr=0.00176, weight_decay=0.01, clamp_value=10000.0, debias=True,
+            lr=0.00176,
+            weight_decay=0.01,
+            clamp_value=10000.0,
+            debias=True,
         )
 
         adjusted_target_batch_size = collab_optimizer_args.target_batch_size - collab_optimizer_args.batch_size_lead
 
         self.collaborative_optimizer = hivemind.CollaborativeOptimizer(
-            opt=opt, dht=dht, prefix=experiment_prefix,
+            opt=opt,
+            dht=dht,
+            prefix=experiment_prefix,
             compression_type=hivemind.utils.CompressionType.Value(collab_optimizer_args.compression),
             throughput=collab_optimizer_args.bandwidth,
-            target_batch_size=adjusted_target_batch_size, client_mode=collab_optimizer_args.client_mode,
-            verbose=True, start=True, **asdict(averager_args)
+            target_batch_size=adjusted_target_batch_size,
+            client_mode=collab_optimizer_args.client_mode,
+            verbose=True,
+            start=True,
+            **asdict(averager_args),
         )
         self.previous_timestamp = time.time()
 
@@ -128,14 +135,18 @@ class CheckpointHandler:
         try:
             subprocess.run("git add --all", shell=True, check=True, cwd=self.repo_path)
             current_step = self.collaborative_optimizer.collaboration_state.optimizer_step
-            subprocess.run(f"git commit -m 'Step {current_step}, loss {current_loss:.3f}'",
-                           shell=True, check=True, cwd=self.repo_path)
+            subprocess.run(
+                f"git commit -m 'Step {current_step}, loss {current_loss:.3f}'",
+                shell=True,
+                check=True,
+                cwd=self.repo_path,
+            )
             subprocess.run("git push", shell=True, check=True, cwd=self.repo_path)
         except subprocess.CalledProcessError as e:
             logger.warning("Error while uploading model:", e.output)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = HfArgumentParser((CoordinatorArguments, CollaborativeOptimizerArguments, AveragerArguments))
     coordinator_args, collab_optimizer_args, averager_args = parser.parse_args_into_dataclasses()
 
@@ -145,9 +156,13 @@ if __name__ == '__main__':
 
     experiment_prefix = coordinator_args.experiment_prefix
     validators, local_public_key = metrics_utils.make_validators(experiment_prefix)
-    dht = hivemind.DHT(start=True, listen_on=coordinator_args.dht_listen_on,
-                       endpoint=f"{coordinator_args.address}:*", initial_peers=coordinator_args.initial_peers,
-                       record_validators=validators)
+    dht = hivemind.DHT(
+        start=True,
+        listen_on=coordinator_args.dht_listen_on,
+        endpoint=f"{coordinator_args.address}:*",
+        initial_peers=coordinator_args.initial_peers,
+        record_validators=validators,
+    )
 
     logger.info(f"Running DHT root at {coordinator_args.address}:{dht.port}")
 
@@ -159,11 +174,10 @@ if __name__ == '__main__':
         checkpoint_handler = CheckpointHandler(coordinator_args, collab_optimizer_args, averager_args, dht)
 
     while True:
-        metrics_dict = dht.get(experiment_prefix + '_metrics', latest=True)
+        metrics_dict = dht.get(experiment_prefix + "_metrics", latest=True)
         if metrics_dict is not None:
             metrics_dict = metrics_dict.value
-            metrics = [metrics_utils.LocalMetrics.parse_obj(metrics_dict[peer].value)
-                       for peer in metrics_dict]
+            metrics = [metrics_utils.LocalMetrics.parse_obj(metrics_dict[peer].value) for peer in metrics_dict]
             latest_step = max(item.step for item in metrics)
             if latest_step != current_step:
                 logger.debug(f"Got metrics from {len(metrics)} peers")
@@ -186,13 +200,15 @@ if __name__ == '__main__':
                 current_loss = sum_loss / sum_mini_steps
 
                 if coordinator_args.wandb_project is not None:
-                    wandb.log({
-                        "loss": current_loss,
-                        "alive peers": alive_peers,
-                        "samples": num_samples,
-                        "performance": sum_perf,
-                        "step": latest_step
-                    })
+                    wandb.log(
+                        {
+                            "loss": current_loss,
+                            "alive peers": alive_peers,
+                            "samples": num_samples,
+                            "performance": sum_perf,
+                            "step": latest_step,
+                        }
+                    )
                 if coordinator_args.store_checkpoins:
                     if checkpoint_handler.is_time_to_save_state(current_step):
                         checkpoint_handler.save_state(current_step)

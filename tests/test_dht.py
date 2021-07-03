@@ -8,7 +8,6 @@ import hivemind
 from hivemind import LOCALHOST, strip_port
 
 
-
 @pytest.mark.forked
 def test_get_store():
     peers = []

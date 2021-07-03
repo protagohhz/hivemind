@@ -12,8 +12,12 @@ from hivemind.dht.storage import DHTLocalStorage, DictionaryDHTValue
 from hivemind.proto import dht_pb2, dht_pb2_grpc as dht_grpc
 from hivemind.utils import Endpoint, get_logger, replace_port, MSGPackSerializer, ChannelCache, GRPC_KEEPALIVE_OPTIONS
 from hivemind.utils.auth import AuthRole, AuthRPCWrapper, AuthorizerBase
-from hivemind.utils.timed_storage import DHTExpiration, get_dht_time, MAX_DHT_TIME_DISCREPANCY_SECONDS, \
-    ValueWithExpiration
+from hivemind.utils.timed_storage import (
+    DHTExpiration,
+    get_dht_time,
+    MAX_DHT_TIME_DISCREPANCY_SECONDS,
+    ValueWithExpiration,
+)
 
 logger = get_logger(__name__)
 
