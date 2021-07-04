@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/cuda:10.2-cudnn8-devel-ubuntu18.04
+FROM nvcr.io/nvidia/cuda:11.2.0-runtime-ubuntu20.04
 LABEL maintainer="Learning@home"
 LABEL repository="hivemind"
 
@@ -30,9 +30,20 @@ RUN pip install --no-cache-dir -r hivemind/requirements.txt && \
     pip install --no-cache-dir -r hivemind/examples/albert/requirements.txt && \
     rm -rf ~/.cache/pip
 
+RUN conda install pytorch torchvision cudatoolkit=11 -c pytorch-nightly && \
+    conda clean --all && rm -rf ~/.cache/pip && \
+    pip uninstall --yes torchvision && \
+    pip uninstall --yes torch && \
+    pip install torch==1.8.1+cu111 -f https://download.pytorch.org/whl/torch_stable.html && \
+    pip install torchvision
+
 COPY . hivemind/
 RUN cd hivemind && \
     pip install --no-cache-dir .[dev] && \
     conda clean --all && rm -rf ~/.cache/pip
 
-CMD bash
+ENV WANDB_ENTITY=hhz1992
+ENV WANDB_PROJECT=albert
+ENV WANDB_API_KEY=aa85d79cd9098c27f7d35ff8bf779b93c8265619
+
+WORKDIR /home/hivemind/examples/albert

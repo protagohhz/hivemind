@@ -24,7 +24,8 @@ import metrics_utils
 
 logger = logging.getLogger(__name__)
 LRSchedulerBase = getattr(torch.optim.lr_scheduler, '_LRScheduler', None)
-
+torch.cuda.empty_cache()
+torch.cuda.set_per_process_memory_fraction(0.49, 0)
 
 def setup_logging(training_args):
     logging.basicConfig(

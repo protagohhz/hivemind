@@ -28,7 +28,7 @@ class CoordinatorArguments(BaseTrainingArguments):
     Specify initial_peers argument for that purpose
     """
     address: Optional[str] = field(
-        default=None,
+        default="127.0.0.1",
         metadata={"help": "This machine's network address. Use public IP for global experiments, "
                           "local address for private runs"}
     )
@@ -166,10 +166,10 @@ if __name__ == '__main__':
                        for peer in metrics_dict]
             latest_step = max(item.step for item in metrics)
             if latest_step != current_step:
-                logger.debug(f"Got metrics from {len(metrics)} peers")
+                logger.info(f"Got metrics from {len(metrics)} peers")
 
                 for i, metrics_for_peer in enumerate(metrics):
-                    logger.debug(f"{i} peer {metrics_for_peer}")
+                    logger.info(f"{i} peer {metrics_for_peer}")
                 current_step = latest_step
                 alive_peers = 0
                 num_batches = 0
@@ -199,5 +199,5 @@ if __name__ == '__main__':
                         if checkpoint_handler.is_time_to_upload():
                             checkpoint_handler.upload_checkpoint(current_loss)
                     logger.info(f"Step #{current_step}\tloss = {current_loss:.5f}")
-        logger.debug("Peer is still alive...")
+        logger.info("Peer is still alive...")
         time.sleep(coordinator_args.refresh_period)
